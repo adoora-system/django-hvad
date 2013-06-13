@@ -3,7 +3,7 @@ from hvad.tests.admin import (NormalAdminTests, AdminEditTests,
     TranslatableInlineAdminTests)
 from hvad.tests.basic import (OptionsTest, BasicQueryTest, AlternateCreateTest, CreateTest, GetTest, 
     TranslatedTest, DeleteLanguageCodeTest, GetByLanguageTest, DescriptorTests, 
-    DefinitionTests, TableNameTest, GetOrCreateTest)
+    DefinitionTests, TableNameTest, GetOrCreateTest, BooleanTests)
 from hvad.tests.dates import LatestTests, DatesTests
 from hvad.tests.docs import DocumentationTests
 from hvad.tests.fallbacks import FallbackTests
@@ -14,7 +14,8 @@ from hvad.tests.query import (FilterTests, IterTests, UpdateTests,
     ValuesListTests, ValuesTests, DeleteTests, GetTranslationFromInstanceTests, 
     AggregateTests, NotImplementedTests, ExcludeTests, ComplexFilterTests)
 from hvad.tests.related import (NormalToNormalFKTest, StandardToTransFKTest, 
-    TripleRelationTests, ManyToManyTest, ForwardDeclaringForeignKeyTests)
+    TripleRelationTests, ManyToManyTest, ForwardDeclaringForeignKeyTests,
+    SelectRelatedTests)
 from hvad.tests.forms_inline import TestBasicInline
 from hvad.tests.views import ViewsTest
 from hvad.tests.limit_choices_to import LimitChoicesToTests

@@ -4,10 +4,11 @@ from django.db import models
 from django.db.models.base import ModelBase
 from django.db.models.signals import post_save
 from django.utils.translation import get_language
+from hvad.compat.metaclasses import with_metaclass
 from hvad.descriptors import LanguageCodeAttribute, TranslatedAttribute
 from hvad.manager import TranslationManager, TranslationsModelManager
 from hvad.utils import SmartGetFieldByName
-from types import MethodType
+from hvad.compat.method_type import MethodType
 import sys
 
 
@@ -103,14 +104,14 @@ class TranslatableModelBase(ModelBase):
             # If this isn't a subclass of TranslatableModel, don't do anything special.
             return super_new(cls, name, bases, attrs)
         new_model = super_new(cls, name, bases, attrs)
-        if not isinstance(new_model.objects, TranslationManager):
+        opts = new_model._meta
+        if not opts.abstract and not isinstance(new_model.objects, TranslationManager):
             raise ImproperlyConfigured(
                 "The default manager on a TranslatableModel must be a "
                 "TranslationManager instance or an instance of a subclass of "
                 "TranslationManager, the default manager of %r is not." %
                 new_model)
         
-        opts = new_model._meta
         if opts.abstract:
             return new_model
         
@@ -126,7 +127,7 @@ class TranslatableModelBase(ModelBase):
                     concrete_model = concrete_model._meta.proxy_for_model
 
         found = False
-        for relation in concrete_model.__dict__.keys():
+        for relation in list(concrete_model.__dict__.keys()):
             try:
                 obj = getattr(new_model, relation)
             except AttributeError:
@@ -156,8 +157,7 @@ class TranslatableModelBase(ModelBase):
         
         if not isinstance(opts.get_field_by_name, SmartGetFieldByName):
             smart_get_field_by_name = SmartGetFieldByName(opts.get_field_by_name)
-            opts.get_field_by_name = MethodType(smart_get_field_by_name , opts,
-                                                opts.__class__)
+            opts.get_field_by_name = MethodType(smart_get_field_by_name , opts)
         
         return new_model
     
@@ -165,12 +165,11 @@ class TranslatableModelBase(ModelBase):
 class NoTranslation(object):
     pass
 
-class TranslatableModel(models.Model):
+
+class TranslatableModel(with_metaclass(TranslatableModelBase, models.Model)):
     """
     Base model for all models supporting translated fields (via TranslatedFields).
     """
-    __metaclass__ = TranslatableModelBase
-    
     # change the default manager to the translation manager
     objects = TranslationManager()
     
@@ -189,7 +188,7 @@ class TranslatableModel(models.Model):
         
         # filter out all the translated fields (including 'master' and 'language_code')
         primary_key_names = ('pk', self._meta.pk.name)
-        for key in kwargs.keys():
+        for key in list(kwargs.keys()):
             if key in self._translated_field_names:
                 if not key in primary_key_names:
                     # we exclude the pk of the shared model
@@ -203,7 +202,7 @@ class TranslatableModel(models.Model):
         # there was at least one of the translated fields (or a language_code) 
         # in kwargs. We need to do magic.
         # extract all the shared fields (including the pk)
-        for key in kwargs.keys():
+        for key in list(kwargs.keys()):
             if key in self._shared_field_names:
                 skwargs[key] = kwargs.pop(key)
         # do the regular init minus the translated fields
@@ -282,20 +281,42 @@ class TranslatableModel(models.Model):
         Lazy translation getter that fetches translations from DB in case the instance is currently untranslated and
         saves the translation instance in the translation cache
         """
-        cache = getattr(self, self._meta.translations_cache, NoTranslation)
-        trans = self._meta.translations_model.objects.filter(master__pk=self.pk)
-        if not cache and cache != NoTranslation and not trans.exists(): # check if there is no translations
+        stuff = self.safe_translation_getter(name, NoTranslation)
+        if stuff is not NoTranslation:
+            return stuff
+
+        # get all translations
+        translations = self._meta.translations_model.objects.filter(master__pk=self.pk)
+
+        # make them a nice dict
+        translation_dict = {}
+        for translation in translations:
+            translation_dict[translation.language_code] = translation
+
+        # see if we have the right language
+        correct_language = translation_dict.get(get_language())
+        if correct_language:
+            # CACHE IT!
+            setattr(self, self._meta.translations_cache, correct_language)
+            return getattr(correct_language, name, default)
+
+        # Nope? Ok, let's try the default language for the installation
+        default_language = translation_dict.get(settings.LANGUAGE_CODE)
+        if default_language:
+            # CACHE IT!
+            setattr(self, self._meta.translations_cache, default_language)
+            return getattr(default_language, name, default)
+
+        # *Sigh*, OK, any available langauge?
+        try:
+            any_language = list(translation_dict.values())[0]
+        except IndexError:
+            # OK, can't say we didn't try!
             return default
-        elif getattr(cache, name, NoTranslation) == NoTranslation and trans.exists(): # We have translations, but no specific translation cached
-            trans_in_own_language = trans.filter(language_code=get_language())
-            if trans_in_own_language.exists():
-                trans = trans_in_own_language[0]
-            else:
-                trans = trans[0]
-            setattr(self, self._meta.translations_cache, trans)
-            return getattr(trans, name)
-        return getattr(cache, name)
-    
+
+        setattr(self, self._meta.translations_cache, any_language)
+        return getattr(any_language, name, default)
+
     def get_available_languages(self):
         manager = self._meta.translations_model.objects
         return manager.filter(master=self).values_list('language_code', flat=True)

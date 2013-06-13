@@ -3,7 +3,7 @@ from django.core.exceptions import FieldError
 from hvad.forms import TranslatableModelForm, TranslatableModelFormMetaclass
 from hvad.test_utils.context_managers import LanguageOverride
 from hvad.test_utils.testcase import NaniTestCase
-from testproject.app.models import Normal
+from hvad.test_utils.project.app.models import Normal
 from django.db import models
 
 class NormalForm(TranslatableModelForm):
@@ -120,13 +120,13 @@ class FormTests(NaniTestCase):
     def test_no_language_code_in_fields(self):
         with LanguageOverride("en"):
             form = NormalForm()
-            self.assertFalse(form.fields.has_key("language_code"))
+            self.assertFalse("language_code" in form.fields)
 
             form = NormalMediaForm()
-            self.assertFalse(form.fields.has_key("language_code"))
+            self.assertFalse("language_code" in form.fields)
 
             form = NormalFormExclude()
-            self.assertFalse(form.fields.has_key("language_code"))
+            self.assertFalse("language_code" in form.fields)
 
     def test_form_wrong_field_in_class(self):
         with LanguageOverride("en"):            

@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 from hvad.admin import TranslatableModelAdminMixin
 from hvad.forms import translatable_inlineformset_factory
-from hvad.forms import TranslatableModelForm, TranslatableModelFormMetaclass
 from hvad.test_utils.context_managers import LanguageOverride
 from hvad.test_utils.testcase import NaniTestCase
 from hvad.test_utils.request_factory import RequestFactory
-from testproject.app.models import Normal, Related
-from django.db import models
+from hvad.test_utils.project.app.models import Normal, Related
 
 class TestBasicInline(NaniTestCase):
     def setUp(self):
@@ -24,7 +22,7 @@ class TestBasicInline(NaniTestCase):
                                                          Normal, Related)(#self.request.POST,
                                                                           instance=self.object)
 
-            self.assertTrue(formset.forms[0].fields.has_key("normal"))
-            self.assertTrue(formset.forms[0].fields.has_key("translated"))
-            self.assertTrue(formset.forms[0].fields.has_key("translated_to_translated"))
-            self.assertFalse(formset.forms[0].fields.has_key("language_code"))
+            self.assertTrue("normal" in formset.forms[0].fields)
+            self.assertTrue("translated" in formset.forms[0].fields)
+            self.assertTrue("translated_to_translated" in formset.forms[0].fields)
+            self.assertFalse("language_code" in formset.forms[0].fields)
